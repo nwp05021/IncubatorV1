@@ -52,6 +52,13 @@ namespace incubator::devices
             uint16_t fgColor,
             uint16_t bgColor) override;
 
+        bool beginSpriteFrame(
+            uint16_t clearColor) override;
+
+        void endSpriteFrame() override;
+
+        bool isSpriteFrameActive() const override;
+
     private:
         class Panel :
             public lgfx::LGFX_Device
@@ -66,5 +73,8 @@ namespace incubator::devices
 
     private:
         Panel m_lcd;
+        LGFX_Sprite m_sprite{&m_lcd};
+        bool m_spriteReady = false;
+        bool m_spriteFrameActive = false;
     };
 }

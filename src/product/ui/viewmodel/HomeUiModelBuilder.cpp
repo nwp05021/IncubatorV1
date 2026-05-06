@@ -31,5 +31,23 @@ namespace incubator::ui
 
         model.currentDay =
             runtime.currentDay;
+
+        model.totalDays =
+            runtime.totalDays;
+
+        model.fanPwm =
+            runtime.fanPwm;
+
+        model.fanOn =
+            runtime.fanPwm > 0;
+
+        model.highTempAlarm =
+            runtime.highTempAlarm;
+
+        model.lowTempAlarm =
+            runtime.lowTempAlarm;
+
+        model.focusedItem =
+            runtime.focusedItem;
     }
 }

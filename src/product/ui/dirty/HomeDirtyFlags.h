@@ -16,6 +16,8 @@ namespace incubator::ui
 
         bool overlay = true;
 
+        bool focusChanged = true;
+
         bool any() const
         {
             return statusBar ||
@@ -23,7 +25,8 @@ namespace incubator::ui
                    humidity ||
                    outputs ||
                    progress ||
-                   overlay;
+                   overlay ||
+                   focusChanged;
         }
 
         void clear()
@@ -34,6 +37,7 @@ namespace incubator::ui
             outputs = false;
             progress = false;
             overlay = false;
+            focusChanged = false;
         }
 
         void markAll()
@@ -44,6 +48,7 @@ namespace incubator::ui
             outputs = true;
             progress = true;
             overlay = true;
+            focusChanged = true;
         }
     };
 }

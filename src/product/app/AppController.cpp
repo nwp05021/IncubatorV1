@@ -38,6 +38,14 @@ namespace incubator::app
                 handleSetTargetHumidity(cmd);
                 break;
 
+            case CommandType::UiRotateLeft:
+                handleUiRotateLeft();
+                break;
+
+            case CommandType::UiRotateRight:
+                handleUiRotateRight();
+                break;
+
             default:
                 break;
         }
@@ -73,5 +81,72 @@ namespace incubator::app
 
         m_runtime.targetHumidityPct =
             value;
+    }
+}
+
+namespace incubator::app
+{
+    using incubator::domain::UiFocusId;
+
+    void AppController::handleUiRotateLeft()
+    {
+        m_runtime.focusedItem =
+            previousFocus(m_runtime.focusedItem);
+    }
+
+    void AppController::handleUiRotateRight()
+    {
+        m_runtime.focusedItem =
+            nextFocus(m_runtime.focusedItem);
+    }
+
+    UiFocusId AppController::nextFocus(
+        UiFocusId current) const
+    {
+        switch (current)
+        {
+            case UiFocusId::Temperature:
+                return UiFocusId::Humidity;
+
+            case UiFocusId::Humidity:
+                return UiFocusId::Fan;
+
+            case UiFocusId::Fan:
+                return UiFocusId::StartButton;
+
+            case UiFocusId::StartButton:
+                return UiFocusId::StopButton;
+
+            case UiFocusId::StopButton:
+                return UiFocusId::Temperature;
+
+            default:
+                return UiFocusId::Temperature;
+        }
+    }
+
+    UiFocusId AppController::previousFocus(
+        UiFocusId current) const
+    {
+        switch (current)
+        {
+            case UiFocusId::Temperature:
+                return UiFocusId::StopButton;
+
+            case UiFocusId::Humidity:
+                return UiFocusId::Temperature;
+
+            case UiFocusId::Fan:
+                return UiFocusId::Humidity;
+
+            case UiFocusId::StartButton:
+                return UiFocusId::Fan;
+
+            case UiFocusId::StopButton:
+                return UiFocusId::StartButton;
+
+            default:
+                return UiFocusId::Temperature;
+        }
     }
 }

@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "../../domain/UiFocusId.h"
+
 namespace incubator::ui
 {
     struct HomeUiModel
@@ -31,5 +33,8 @@ namespace incubator::ui
         uint16_t currentDay = 0;
 
         uint16_t totalDays = 21;
+
+        incubator::domain::UiFocusId focusedItem =
+            incubator::domain::UiFocusId::Temperature;
     };
 }

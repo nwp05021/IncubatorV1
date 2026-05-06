@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "UiFocusId.h"
+
 namespace incubator::domain
 {
     enum class SystemMode
@@ -66,6 +68,11 @@ namespace incubator::domain
         bool wifiConnected = false;
 
         bool awsConnected = false;
+
+        // ---------- UI ----------
+
+        UiFocusId focusedItem =
+            UiFocusId::Temperature;
 
         // ---------- Runtime ----------
 

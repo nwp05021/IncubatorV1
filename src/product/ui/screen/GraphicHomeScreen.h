@@ -3,10 +3,12 @@
 #include "../model/HomeUiModel.h"
 #include "../dirty/HomeUiDiff.h"
 #include "../render/GraphicHomeRenderer.h"
+#include "../screen_manager/IScreen.h"
 
 namespace incubator::ui
 {
-    class GraphicHomeScreen
+    class GraphicHomeScreen :
+        public IScreen
     {
     public:
         explicit GraphicHomeScreen(
@@ -15,6 +17,13 @@ namespace incubator::ui
     public:
         void render(
             const HomeUiModel& current);
+
+        void onEnter() override;
+
+        void onExit() override;
+
+        void render(
+            const ScreenContext& context) override;
 
         void invalidate();
 

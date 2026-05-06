@@ -36,4 +36,25 @@ namespace incubator::ui
     {
         m_firstRender = true;
     }
+
+    void GraphicHomeScreen::onEnter()
+    {
+        invalidate();
+    }
+
+    void GraphicHomeScreen::onExit()
+    {
+    }
+
+    void GraphicHomeScreen::render(
+        const ScreenContext& context)
+    {
+        if (context.home == nullptr)
+        {
+            return;
+        }
+
+        render(*context.home);
+    }
+
 }

@@ -50,5 +50,21 @@ namespace incubator::devices
             int percent,
             uint16_t fgColor,
             uint16_t bgColor) = 0;
+
+        virtual bool beginSpriteFrame(
+            uint16_t clearColor)
+        {
+            (void)clearColor;
+            return false;
+        }
+
+        virtual void endSpriteFrame()
+        {
+        }
+
+        virtual bool isSpriteFrameActive() const
+        {
+            return false;
+        }
     };
 }

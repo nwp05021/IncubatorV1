@@ -16,6 +16,12 @@ namespace incubator::app
 
         FanPwm,
 
+        UiRotateLeft,
+        UiRotateRight,
+        UiClick,
+        UiButtonDown,
+        UiButtonUp,
+
         EnterSafeMode,
         ClearSafeMode
     };

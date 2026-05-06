@@ -34,14 +34,18 @@ namespace incubator::ui
             2);
 
         m_display.drawText(
-            200,
-            7,
-            model.wifiConnected ?
-            "WIFI" :
-            "OFF",
-            model.wifiConnected ?
-            UiTheme::Good :
-            UiTheme::Warning,
+            r.x + 190,
+            r.y + 7,
+            model.wifiConnected ? "WIFI" : "NO WIFI",
+            model.wifiConnected ? UiTheme::Good : UiTheme::Warning,
+            UiTheme::Surface,
+            1);
+
+        m_display.drawText(
+            r.x + 260,
+            r.y + 7,
+            model.awsConnected ? "AWS" : "OFF",
+            model.awsConnected ? UiTheme::Good : UiTheme::MutedText,
             UiTheme::Surface,
             1);
     }

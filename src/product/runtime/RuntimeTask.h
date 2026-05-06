@@ -17,6 +17,7 @@ namespace incubator::runtime
         Alarm,
         Recovery,
         AppController,
+        Input,
         Event,
         Toast,
         UI,

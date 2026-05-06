@@ -28,6 +28,16 @@ namespace incubator::app
         void handleSetTargetHumidity(
             const Command& cmd);
 
+        void handleUiRotateLeft();
+
+        void handleUiRotateRight();
+
+        incubator::domain::UiFocusId nextFocus(
+            incubator::domain::UiFocusId current) const;
+
+        incubator::domain::UiFocusId previousFocus(
+            incubator::domain::UiFocusId current) const;
+
     private:
         incubator::domain::RuntimeState& m_runtime;
 

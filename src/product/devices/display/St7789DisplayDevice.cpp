@@ -64,22 +64,45 @@ namespace incubator::devices
         m_lcd.setBrightness(180);
         m_lcd.fillScreen(TFT_BLACK);
 
+        m_sprite.setColorDepth(16);
+        void* spriteBuffer =
+            m_sprite.createSprite(320, 240);
+
+        m_spriteReady =
+            spriteBuffer != nullptr;
+
         return true;
     }
 
     void St7789DisplayDevice::beginFrame()
     {
+        if (m_spriteFrameActive)
+        {
+            return;
+        }
+
         m_lcd.startWrite();
     }
 
     void St7789DisplayDevice::endFrame()
     {
+        if (m_spriteFrameActive)
+        {
+            return;
+        }
+
         m_lcd.endWrite();
     }
 
     void St7789DisplayDevice::clear(
         uint16_t color)
     {
+        if (m_spriteFrameActive)
+        {
+            m_sprite.fillScreen(color);
+            return;
+        }
+
         m_lcd.fillScreen(color);
     }
 
@@ -90,6 +113,17 @@ namespace incubator::devices
         int h,
         uint16_t color)
     {
+        if (m_spriteFrameActive)
+        {
+            m_sprite.fillRect(
+                x,
+                y,
+                w,
+                h,
+                color);
+            return;
+        }
+
         m_lcd.fillRect(
             x,
             y,
@@ -106,6 +140,15 @@ namespace incubator::devices
         uint16_t bgColor,
         int textSize)
     {
+        if (m_spriteFrameActive)
+        {
+            m_sprite.setTextSize(textSize);
+            m_sprite.setTextColor(color, bgColor);
+            m_sprite.setCursor(x, y);
+            m_sprite.print(text);
+            return;
+        }
+
         m_lcd.setTextSize(textSize);
         m_lcd.setTextColor(color, bgColor);
         m_lcd.setCursor(x, y);
@@ -175,4 +218,37 @@ namespace incubator::devices
             h,
             fgColor);
     }
+    bool St7789DisplayDevice::beginSpriteFrame(
+        uint16_t clearColor)
+    {
+        if (!m_spriteReady)
+        {
+            return false;
+        }
+
+        m_spriteFrameActive = true;
+        m_sprite.fillScreen(clearColor);
+
+        return true;
+    }
+
+    void St7789DisplayDevice::endSpriteFrame()
+    {
+        if (!m_spriteFrameActive)
+        {
+            return;
+        }
+
+        m_lcd.startWrite();
+        m_sprite.pushSprite(0, 0);
+        m_lcd.endWrite();
+
+        m_spriteFrameActive = false;
+    }
+
+    bool St7789DisplayDevice::isSpriteFrameActive() const
+    {
+        return m_spriteFrameActive;
+    }
+
 }

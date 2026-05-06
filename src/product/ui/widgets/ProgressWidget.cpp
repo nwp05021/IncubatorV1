@@ -2,6 +2,8 @@
 
 #include "../theme/UiTheme.h"
 
+#include <stdio.h>
+
 namespace incubator::ui
 {
     ProgressWidget::ProgressWidget(
@@ -27,6 +29,25 @@ namespace incubator::ui
                 model.totalDays;
         }
 
+        if (percent < 0)
+        {
+            percent = 0;
+        }
+
+        if (percent > 100)
+        {
+            percent = 100;
+        }
+
+        char dayText[24];
+
+        snprintf(
+            dayText,
+            sizeof(dayText),
+            "DAY %d/%d",
+            model.currentDay,
+            model.totalDays);
+
         m_display.fillRect(
             r.x,
             r.y,
@@ -37,8 +58,16 @@ namespace incubator::ui
         m_display.drawText(
             r.x + 8,
             r.y + 6,
-            "INCUBATION",
+            "INCUBATION PROGRESS",
             UiTheme::MutedText,
+            UiTheme::Background,
+            1);
+
+        m_display.drawText(
+            r.x + r.w - 76,
+            r.y + 6,
+            dayText,
+            UiTheme::Text,
             UiTheme::Background,
             1);
 

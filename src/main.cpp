@@ -3,36 +3,50 @@
 #include "product/devices/display/St7789DisplayDevice.h"
 
 #include "product/ui/model/HomeUiModel.h"
-#include "product/ui/screen/GraphicHomeScreen.h"
+
+#include "product/ui/layout/HomeLayout.h"
+
+#include "product/ui/widgets/StatusBarWidget.h"
+#include "product/ui/widgets/TemperatureCardWidget.h"
+#include "product/ui/widgets/ProgressWidget.h"
 
 using namespace incubator;
 
 devices::St7789DisplayDevice displayDevice;
 
-ui::GraphicHomeScreen homeScreen(
+ui::HomeLayout layout;
+
+ui::StatusBarWidget statusWidget(
     displayDevice);
 
-ui::HomeUiModel homeModel;
+ui::TemperatureCardWidget tempWidget(
+    displayDevice);
+
+ui::ProgressWidget progressWidget(
+    displayDevice);
+
+ui::HomeUiModel model;
 
 uint32_t lastUpdateMs = 0;
 
 void setup()
 {
-    Serial.begin(115200);
-
     displayDevice.begin();
 
     displayDevice.clear(0x0000);
 
-    homeModel.tempC = 37.5f;
-    homeModel.humidityPct = 60.0f;
-    homeModel.currentDay = 7;
-    homeModel.totalDays = 21;
-    homeModel.wifiConnected = true;
-    homeModel.awsConnected = false;
+    model.tempC = 37.5f;
+    model.currentDay = 7;
+    model.totalDays = 21;
+    model.wifiConnected = true;
 
-    homeScreen.invalidate();
-    homeScreen.render(homeModel);
+    displayDevice.beginFrame();
+
+    statusWidget.render(layout, model);
+    tempWidget.render(layout, model);
+    progressWidget.render(layout, model);
+
+    displayDevice.endFrame();
 }
 
 void loop()
@@ -43,28 +57,25 @@ void loop()
     {
         lastUpdateMs = now;
 
-        homeModel.tempC += 0.1f;
+        model.tempC += 0.1f;
 
-        if (homeModel.tempC > 38.2f)
+        if (model.tempC > 38.3f)
         {
-            homeModel.tempC = 37.4f;
-            homeModel.heaterOn = !homeModel.heaterOn;
+            model.tempC = 37.4f;
+
+            model.heaterOn =
+                !model.heaterOn;
         }
 
-        homeModel.humidityPct += 1.0f;
+        displayDevice.beginFrame();
 
-        if (homeModel.humidityPct > 68.0f)
-        {
-            homeModel.humidityPct = 58.0f;
-            homeModel.humidifierOn = !homeModel.humidifierOn;
-        }
+        tempWidget.render(layout, model);
 
-        homeScreen.render(homeModel);
+        displayDevice.endFrame();
     }
 
     vTaskDelay(1);
 }
-
 
 
 extern "C" void app_main()

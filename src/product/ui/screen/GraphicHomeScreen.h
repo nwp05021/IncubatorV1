@@ -2,12 +2,16 @@
 
 #include "../model/HomeUiModel.h"
 #include "../dirty/HomeUiDiff.h"
-#include "../render/HomeRenderer.h"
+#include "../render/GraphicHomeRenderer.h"
 
 namespace incubator::ui
 {
-    class HomeScreen
+    class GraphicHomeScreen
     {
+    public:
+        explicit GraphicHomeScreen(
+            incubator::devices::IDisplayDevice& display);
+
     public:
         void render(
             const HomeUiModel& current);
@@ -19,7 +23,7 @@ namespace incubator::ui
 
         HomeUiDiff m_diff;
 
-        HomeRenderer m_renderer;
+        GraphicHomeRenderer m_renderer;
 
         bool m_firstRender = true;
     };

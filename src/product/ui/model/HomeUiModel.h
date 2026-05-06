@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 namespace incubator::ui
 {
     struct HomeUiModel
@@ -12,12 +14,22 @@ namespace incubator::ui
 
         bool humidifierOn = false;
 
+        bool fanOn = false;
+
+        uint8_t fanPwm = 0;
+
         bool wifiConnected = false;
 
         bool awsConnected = false;
 
         bool safeMode = false;
 
-        int currentDay = 0;
+        bool highTempAlarm = false;
+
+        bool lowTempAlarm = false;
+
+        uint16_t currentDay = 0;
+
+        uint16_t totalDays = 21;
     };
 }

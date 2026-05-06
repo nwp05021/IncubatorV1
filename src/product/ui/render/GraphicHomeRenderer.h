@@ -1,12 +1,18 @@
 #pragma once
 
+#include "../../devices/display/IDisplayDevice.h"
+
 #include "../model/HomeUiModel.h"
 #include "../dirty/HomeDirtyFlags.h"
 
 namespace incubator::ui
 {
-    class HomeRenderer
+    class GraphicHomeRenderer
     {
+    public:
+        explicit GraphicHomeRenderer(
+            incubator::devices::IDisplayDevice& display);
+
     public:
         void render(
             const HomeUiModel& model,
@@ -30,5 +36,8 @@ namespace incubator::ui
 
         void renderOverlay(
             const HomeUiModel& model);
+
+    private:
+        incubator::devices::IDisplayDevice& m_display;
     };
 }

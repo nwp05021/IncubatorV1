@@ -1,54 +1,71 @@
 #include <Arduino.h>
 
-#include "product/domain/RuntimeState.h"
+#include "product/devices/display/St7789DisplayDevice.h"
 
-#include "product/cloud/WifiManager.h"
-#include "product/cloud/AwsIotClient.h"
-
-#include "product/time/TimeService.h"
+#include "product/ui/model/HomeUiModel.h"
+#include "product/ui/screen/GraphicHomeScreen.h"
 
 using namespace incubator;
 
-domain::RuntimeState runtime;
+devices::St7789DisplayDevice displayDevice;
 
-cloud::WifiManager wifi;
+ui::GraphicHomeScreen homeScreen(
+    displayDevice);
 
-cloud::AwsIotClient aws;
+ui::HomeUiModel homeModel;
 
-time::TimeService timeService;
+uint32_t lastUpdateMs = 0;
 
 void setup()
 {
     Serial.begin(115200);
 
-    wifi.begin(
-        "MY_WIFI",
-        "12345678");
+    displayDevice.begin();
 
-    aws.begin();
+    displayDevice.clear(0x0000);
 
-    timeService.begin();
+    homeModel.tempC = 37.5f;
+    homeModel.humidityPct = 60.0f;
+    homeModel.currentDay = 7;
+    homeModel.totalDays = 21;
+    homeModel.wifiConnected = true;
+    homeModel.awsConnected = false;
 
-    runtime.currentTempC = 37.5f;
-
-    runtime.currentHumidityPct = 60.0f;
+    homeScreen.invalidate();
+    homeScreen.render(homeModel);
 }
 
 void loop()
 {
     const uint32_t now = millis();
 
-    timeService.tick(now);
-
-    wifi.tick();
-
-    aws.tick();
-
-    if ((now % 5000) < 50)
+    if ((now - lastUpdateMs) >= 1000)
     {
-        aws.publishTelemetry(runtime);
+        lastUpdateMs = now;
+
+        homeModel.tempC += 0.1f;
+
+        if (homeModel.tempC > 38.2f)
+        {
+            homeModel.tempC = 37.4f;
+            homeModel.heaterOn = !homeModel.heaterOn;
+        }
+
+        homeModel.humidityPct += 1.0f;
+
+        if (homeModel.humidityPct > 68.0f)
+        {
+            homeModel.humidityPct = 58.0f;
+            homeModel.humidifierOn = !homeModel.humidifierOn;
+        }
+
+        homeScreen.render(homeModel);
     }
+
+    vTaskDelay(1);
 }
+
+
 
 extern "C" void app_main()
 {

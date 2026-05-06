@@ -1,8 +1,15 @@
-#include "HomeScreen.h"
+#include "GraphicHomeScreen.h"
 
 namespace incubator::ui
 {
-    void HomeScreen::render(
+    GraphicHomeScreen::GraphicHomeScreen(
+        incubator::devices::IDisplayDevice& display)
+        :
+        m_renderer(display)
+    {
+    }
+
+    void GraphicHomeScreen::render(
         const HomeUiModel& current)
     {
         HomeDirtyFlags dirty =
@@ -17,13 +24,15 @@ namespace incubator::ui
 
         if (dirty.any())
         {
-            m_previous = current;
+            m_previous =
+                current;
 
-            m_firstRender = false;
+            m_firstRender =
+                false;
         }
     }
 
-    void HomeScreen::invalidate()
+    void GraphicHomeScreen::invalidate()
     {
         m_firstRender = true;
     }

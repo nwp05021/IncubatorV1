@@ -1,0 +1,19 @@
+product/
+├── app/
+│   ├── AppController.h
+│   ├── AppController.cpp
+│   ├── Command.h
+│   ├── CommandQueue.h
+│   └── CommandQueue.cpp
+│
+├── domain/
+│   ├── RuntimeState.h
+│   ├── AppSettings.h
+│   ├── BatchState.h
+│   └── PlanRow.h
+│
+├── modules/
+├── ui/
+├── cloud/
+├── recovery/
+└── devices/

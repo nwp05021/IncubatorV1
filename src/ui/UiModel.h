@@ -41,6 +41,7 @@ namespace incubator::ui
         bool     turningEnabled    = true;
         uint16_t nextTurningInMin  = 0;
         uint16_t lockdownStartDay  = 19;
+        uint32_t batchStartEpoch   = 0;
 
         uint16_t editDay           = 1;
         float    editTempC         = 37.5f;

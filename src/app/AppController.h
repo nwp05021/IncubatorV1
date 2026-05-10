@@ -89,5 +89,6 @@ namespace incubator::app
         bool cmdClearSafeMode();
 
         void generateBatchId(domain::IncubationBatch& b);
+        void applyBatchToState();
     };
 }

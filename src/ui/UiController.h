@@ -58,7 +58,7 @@ namespace incubator::ui
         void savePlanEdit();
         void loadEditRow(uint16_t day);
         uint32_t editDateEpoch() const;
-        void initDateFromNow();
+        void initDateFromSavedOrNow();
 
         UiModel& m_model;
         const domain::RuntimeState& m_state;

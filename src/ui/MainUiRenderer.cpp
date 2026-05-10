@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 
 namespace incubator::ui
 {
@@ -57,17 +58,18 @@ namespace
         return static_cast<int16_t>(std::lroundf(value));
     }
 
-    uint32_t visibleHash(const UiModel& model)
+    uint32_t visibleHash(const UiModel& model, uint32_t nowMs)
     {
         uint32_t hash = 2166136261U;
-        const uint32_t clockMinute = model.uptimeMs / 60000U;
+        const uint32_t clockSecond = nowMs / 1000U;
 
         hashValue(hash, model.screen);
         hashValue(hash, model.activePage);
-        hashValue(hash, clockMinute);
+        hashValue(hash, clockSecond);
         hashValue(hash, model.currentDay);
         hashValue(hash, model.totalDays);
         hashValue(hash, model.progressPct);
+        hashValue(hash, model.batchStartEpoch);
         hashValue(hash, model.cloudConnected);
         hashValue(hash, model.wifiConfigured);
         hashValue(hash, model.tempAlarm);
@@ -87,6 +89,9 @@ namespace
         hashValue(hash, model.fanOn);
         hashValue(hash, model.turningEnabled);
         hashValue(hash, model.nextTurningInMin);
+        if (model.heaterOn || model.humidifierOn || model.turnerOn || model.fanOn) {
+            hashValue(hash, nowMs / 500U);
+        }
 
         hashValue(hash, model.menuCursor);
         hashValue(hash, model.manualCursor);
@@ -154,12 +159,52 @@ namespace
         return false;
     }
 
-    void formatClock(uint32_t uptimeMs, char* out, size_t len)
+    void formatDateTime(uint32_t uptimeMs, char* out, size_t len)
     {
-        uint32_t minutes = uptimeMs / 60000U;
+        std::time_t now = std::time(nullptr);
+        std::tm tmv = {};
+        bool valid = false;
+#if defined(_WIN32)
+        valid = localtime_s(&tmv, &now) == 0;
+#else
+        if (std::tm* local = std::localtime(&now)) {
+            tmv = *local;
+            valid = true;
+        }
+#endif
+        if (valid && tmv.tm_year >= 120) {
+            std::snprintf(out, len, "%02d-%02d %02d:%02d:%02d",
+                          tmv.tm_mon + 1, tmv.tm_mday,
+                          tmv.tm_hour, tmv.tm_min, tmv.tm_sec);
+            return;
+        }
+
+        uint32_t seconds = uptimeMs / 1000U;
+        uint32_t minutes = seconds / 60U;
         uint32_t hours = (minutes / 60U) % 24U;
-        minutes %= 60U;
-        std::snprintf(out, len, "%02u:%02u", hours, minutes);
+        std::snprintf(out, len, "-- -- %02u:%02u:%02u",
+                      hours, minutes % 60U, seconds % 60U);
+    }
+
+    void formatDate(char* out, size_t len)
+    {
+        std::time_t now = std::time(nullptr);
+        std::tm tmv = {};
+        bool valid = false;
+#if defined(_WIN32)
+        valid = localtime_s(&tmv, &now) == 0;
+#else
+        if (std::tm* local = std::localtime(&now)) {
+            tmv = *local;
+            valid = true;
+        }
+#endif
+        if (valid && tmv.tm_year >= 120) {
+            std::snprintf(out, len, "%04d-%02d-%02d",
+                          tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday);
+        } else {
+            std::snprintf(out, len, "---- -- --");
+        }
     }
 
     const char* presetName(uint8_t i)
@@ -176,10 +221,11 @@ namespace
 
 void MainUiRenderer::render(uint32_t nowMs)
 {
-    const uint32_t hash = visibleHash(m_model);
+    const uint32_t hash = visibleHash(m_model, nowMs);
     if (m_hasRendered && hash == m_lastVisibleHash) return;
     if (m_hasRendered && nowMs - m_lastRenderMs < 50U) return;
 
+    m_renderNowMs = nowMs;
     m_lastRenderMs = nowMs;
     m_lastVisibleHash = hash;
     m_hasRendered = true;
@@ -193,7 +239,6 @@ void MainUiRenderer::render(uint32_t nowMs)
 
     m_display.fillScreen(Color::kBg);
     drawStatusBar();
-    renderHeader();
 
     switch (m_model.screen) {
         case UiScreen::Main:
@@ -230,28 +275,33 @@ void MainUiRenderer::render(uint32_t nowMs)
 void MainUiRenderer::drawStatusBar()
 {
     char buffer[32];
-    m_display.fillRect(0, 0, Layout::kScreenW, 24, 0x0000U);
-    m_display.setTextSize(2);
-    m_display.setTextColor(Color::kText, 0x0000U);
-    formatClock(m_model.uptimeMs, buffer, sizeof(buffer));
-    m_display.drawText(8, 5, buffer);
+    m_display.fillRect(0, 0, Layout::kScreenW, 26, Color::kHeader);
+    m_display.setTextColor(Color::kText, Color::kHeader);
 
-    std::snprintf(buffer, sizeof(buffer), "Day %u/%u", m_model.currentDay, m_model.totalDays);
-    m_display.setTextSize(1);
-    m_display.setTextColor(Color::kTextDim, 0x0000U);
-    m_display.drawText(78, 8, buffer);
-
-    m_display.setTextColor(m_model.cloudConnected ? kOk : Color::kTextDim, 0x0000U);
-    drawSignalBars(230, 6, m_model.cloudConnected || m_model.wifiConfigured);
-    m_display.drawRect(251, 7, 10, 10, (m_model.tempAlarm || m_model.humiAlarm || m_model.tempSensorFault || m_model.humiSensorFault) ? kDanger : kPanelSoft);
-    if (m_model.lockdownActive) {
-        m_display.setTextColor(kWarn, 0x0000U);
-        m_display.drawText(264, 8, "LOCK");
+    if (m_model.screen == UiScreen::Main && m_model.activePage == 0U) {
+        m_display.setTextSize(2);
+        formatDateTime(m_model.uptimeMs, buffer, sizeof(buffer));
+        m_display.drawText(8, 5, buffer);
     } else {
-        std::snprintf(buffer, sizeof(buffer), "%u%%", m_model.progressPct);
-        m_display.setTextColor(Color::kTextDim, 0x0000U);
-        m_display.drawText(284, 8, buffer);
+        m_display.setTextSize(1);
+        m_display.drawText(10, 6, screenTitle(m_model));
+        formatDate(buffer, sizeof(buffer));
+        m_display.setTextColor(Color::kTextDim, Color::kHeader);
+        m_display.drawText(236, 6, buffer);
     }
+
+    if (m_model.screen == UiScreen::Main && m_model.activePage == 0U) {
+        drawSignalBars(258, 5, m_model.cloudConnected, m_model.wifiConfigured);
+        const bool alarm = m_model.tempAlarm || m_model.humiAlarm ||
+                           m_model.tempSensorFault || m_model.humiSensorFault;
+        const uint32_t warnColor = alarm ? kDanger : Color::kOffIcon;
+        m_display.drawRect(292, 6, 18, 14, warnColor);
+        m_display.setTextSize(1);
+        m_display.setTextColor(warnColor, Color::kHeader);
+        m_display.drawText(298, 7, "!");
+    }
+    m_display.setTextSize(1);
+    m_display.drawLine(0, 25, Layout::kScreenW, 25, Color::kDivider);
 }
 
 void MainUiRenderer::renderHeader()
@@ -270,9 +320,12 @@ void MainUiRenderer::renderFooter()
     m_display.drawLine(0, 215, Layout::kScreenW, 215, Color::kDivider);
     m_display.fillRect(0, 216, Layout::kScreenW, 24, Color::kFooter);
     if (m_model.screen == UiScreen::Main) {
+        char progress[20];
         drawStatusIcons();
-        m_display.setTextColor(Color::kTextDim, Color::kFooter);
-        m_display.drawText(204, 225, "길게: 메뉴");
+        std::snprintf(progress, sizeof(progress), "%u일차/%u", m_model.currentDay, m_model.totalDays);
+        m_display.setTextSize(1);
+        m_display.setTextColor(Color::kText, Color::kFooter);
+        m_display.drawText(244, 225, progress);
     } else {
         m_display.setTextSize(1);
         m_display.setTextColor(Color::kTextDim, Color::kFooter);
@@ -287,34 +340,39 @@ void MainUiRenderer::renderFooter()
 void MainUiRenderer::renderPage0()
 {
     char buffer[48];
-    m_display.setTextColor(m_model.tempSensorFault ? kDanger : Color::kAccentTemp, Color::kBg);
+
+    m_display.drawLine(160, 32, 160, 158, Color::kDivider);
+    m_display.drawLine(16, 158, 144, 158, kPanelSoft);
+    m_display.drawLine(176, 158, 304, 158, kPanelSoft);
+
     m_display.setTextSize(1);
-    m_display.drawText(44, 66, "온도");
-    std::snprintf(buffer, sizeof(buffer), "%.1f", m_model.displayTempC);
-    m_display.drawNumberText(16, 92, buffer);
+    m_display.setTextColor(m_model.tempSensorFault ? kDanger : Color::kAccentTemp, Color::kBg);
+    m_display.drawText(44, 42, "온도  C");
+    if (m_model.tempSensorFault) std::snprintf(buffer, sizeof(buffer), "---");
+    else std::snprintf(buffer, sizeof(buffer), "%.1f", m_model.displayTempC);
+    m_display.setTextSize(1);
+    m_display.drawNumberText(18, 78, buffer);
     if (m_model.tempSensorFault) {
         m_display.setTextSize(1);
-        m_display.drawText(76, 150, "SENSOR");
+        m_display.drawText(54, 142, "SENSOR");
     }
-    m_display.setTextSize(2);
-    m_display.drawText(112, 126, "C");
 
     m_display.setTextColor(m_model.humiSensorFault ? kDanger : Color::kAccentHumi, Color::kBg);
     m_display.setTextSize(1);
-    m_display.drawText(208, 66, "습도");
-    std::snprintf(buffer, sizeof(buffer), "%.0f", m_model.displayHumidPct);
-    m_display.drawNumberText(178, 92, buffer);
+    m_display.drawText(212, 42, "습도  %");
+    if (m_model.humiSensorFault) std::snprintf(buffer, sizeof(buffer), "---");
+    else std::snprintf(buffer, sizeof(buffer), "%.0f", m_model.displayHumidPct);
+    m_display.setTextSize(1);
+    m_display.drawNumberText(m_model.humiSensorFault ? 194 : 204, 78, buffer);
     if (m_model.humiSensorFault) {
         m_display.setTextSize(1);
-        m_display.drawText(218, 150, "SENSOR");
+        m_display.drawText(214, 142, "SENSOR");
     }
-    m_display.setTextSize(2);
-    m_display.drawText(260, 126, "%");
 
     std::snprintf(buffer, sizeof(buffer), "목표 %.1fC", m_model.targetTempC);
-    drawPill(28, 166, 104, buffer, Color::kAccentTemp);
+    drawPill(24, 174, 116, buffer, Color::kAccentTemp);
     std::snprintf(buffer, sizeof(buffer), "목표 %.0f%%", m_model.targetHumidPct);
-    drawPill(184, 166, 104, buffer, Color::kAccentHumi);
+    drawPill(180, 174, 116, buffer, Color::kAccentHumi);
 }
 
 void MainUiRenderer::renderPage1()
@@ -383,17 +441,62 @@ void MainUiRenderer::renderMenu()
 void MainUiRenderer::renderStartDate()
 {
     char value[24];
-    std::snprintf(value, sizeof(value), "%u", m_model.editBatchYear);
-    drawRow(66, "부화시작 년도", value, m_model.fieldCursor == 0, Color::kAccentTemp);
-    std::snprintf(value, sizeof(value), "%u", m_model.editBatchMonth);
-    drawRow(100, "부화시작 월", value, m_model.fieldCursor == 1, Color::kAccentHumi);
-    std::snprintf(value, sizeof(value), "%u", m_model.editBatchDay);
-    drawRow(134, "부화시작 일", value, m_model.fieldCursor == 2, kTeal);
-    drawRow(176, "[저장]", "적용", m_model.fieldCursor == 3, kOk);
-    drawRow(176, "[취소]", "복귀", m_model.fieldCursor == 4, Color::kOffIcon);
-    if (m_model.fieldCursor == 4) {
-        m_display.drawRect(160, 176, 148, 28, Color::kOffIcon);
+    char dateText[24];
+    std::snprintf(dateText, sizeof(dateText), "%04u-%02u-%02u",
+                  m_model.editBatchYear, m_model.editBatchMonth, m_model.editBatchDay);
+
+    m_display.setTextSize(1);
+    m_display.setTextColor(Color::kTextDim, Color::kBg);
+    m_display.drawText(24, 38, "부화일 계산에 사용할 시작일을 등록합니다.");
+    m_display.setTextColor(kTeal, Color::kBg);
+    m_display.drawText(112, 58, dateText);
+
+    struct Field {
+        const char* label;
+        const char* unit;
+        uint32_t accent;
+    };
+    static constexpr Field kFields[] = {
+        {"년도", "년", Color::kAccentTemp},
+        {"월", "월", Color::kAccentHumi},
+        {"일", "일", kTeal},
+    };
+
+    for (uint8_t i = 0; i < 3; ++i) {
+        const int y = 82 + static_cast<int>(i) * 34;
+        const bool selected = m_model.fieldCursor == i;
+        const uint32_t bg = selected ? Color::kSelected : kPanel;
+        const uint32_t border = selected ? (m_model.editMode ? kWarn : kFields[i].accent) : kPanelSoft;
+
+        if (i == 0U) std::snprintf(value, sizeof(value), "%04u", m_model.editBatchYear);
+        else if (i == 1U) std::snprintf(value, sizeof(value), "%02u", m_model.editBatchMonth);
+        else std::snprintf(value, sizeof(value), "%02u", m_model.editBatchDay);
+
+        m_display.fillRect(28, y, 264, 28, bg);
+        m_display.drawRect(28, y, 264, 28, border);
+        m_display.fillRect(36, y + 7, 6, 14, kFields[i].accent);
+        m_display.setTextSize(1);
+        m_display.setTextColor(Color::kTextDim, bg);
+        m_display.drawText(54, y + 6, kFields[i].label);
+        m_display.setTextSize(2);
+        m_display.setTextColor(Color::kText, bg);
+        m_display.drawText(146, y + 5, value);
+        m_display.setTextSize(1);
+        m_display.setTextColor(Color::kTextDim, bg);
+        m_display.drawText(226, y + 9, kFields[i].unit);
     }
+
+    const uint32_t saveBg = (m_model.fieldCursor == 3U) ? Color::kSelected : kPanel;
+    const uint32_t cancelBg = (m_model.fieldCursor == 4U) ? Color::kSelected : kPanel;
+    m_display.fillRect(70, 190, 78, 20, saveBg);
+    m_display.drawRect(70, 190, 78, 20, (m_model.fieldCursor == 3U) ? kOk : kPanelSoft);
+    m_display.fillRect(172, 190, 78, 20, cancelBg);
+    m_display.drawRect(172, 190, 78, 20, (m_model.fieldCursor == 4U) ? Color::kOffIcon : kPanelSoft);
+    m_display.setTextSize(1);
+    m_display.setTextColor(Color::kText, saveBg);
+    m_display.drawText(94, 194, "등록");
+    m_display.setTextColor(Color::kText, cancelBg);
+    m_display.drawText(196, 194, "취소");
 }
 
 void MainUiRenderer::renderPreset()
@@ -507,18 +610,33 @@ void MainUiRenderer::renderFactoryReset()
 void MainUiRenderer::drawStatusIcons()
 {
     m_display.setTextSize(1);
-    drawPill(8, 218, 42, "히터", m_model.heaterOn ? kOk : Color::kOffIcon);
-    drawPill(54, 218, 42, "가습", m_model.humidifierOn ? kOk : Color::kOffIcon);
-    drawPill(100, 218, 42, "전란", m_model.turnerOn ? kOk : Color::kOffIcon);
-    drawPill(146, 218, 32, "팬", m_model.fanOn ? kOk : Color::kOffIcon);
+    const bool blinkVisible = ((m_renderNowMs / 500U) % 2U) == 0U;
+
+    auto drawFooterPill = [&](int x, int w, const char* label, bool active) {
+        const uint32_t border = active ? kOk : Color::kOffIcon;
+        const uint32_t fill = (active && blinkVisible) ? kOk : Color::kFooter;
+        const uint32_t text = (active && blinkVisible) ? 0x0000U : (active ? kOk : Color::kTextDim);
+
+        m_display.fillRect(x, 218, w, 20, fill);
+        m_display.drawRect(x, 218, w, 20, border);
+        m_display.setTextColor(text, fill);
+        m_display.drawText(x + (hasUtf8(label) ? 8 : 6), 222, label);
+    };
+
+    drawFooterPill(8, 42, "히터", m_model.heaterOn);
+    drawFooterPill(54, 42, "가습", m_model.humidifierOn);
+    drawFooterPill(100, 42, "전란", m_model.turnerOn);
+    drawFooterPill(146, 32, "팬", m_model.fanOn);
 }
 
-void MainUiRenderer::drawSignalBars(int x, int y, bool connected)
+void MainUiRenderer::drawSignalBars(int x, int y, bool connected, bool configured)
 {
-    uint32_t color = connected ? kOk : Color::kOffIcon;
-    m_display.fillRect(x, y + 9, 3, 3, color);
-    m_display.fillRect(x + 5, y + 6, 3, 6, color);
-    m_display.fillRect(x + 10, y + 3, 3, 9, color);
+    const uint32_t offColor = configured ? kPanelSoft : Color::kOffIcon;
+    for (uint8_t i = 0; i < 4; ++i) {
+        const int h = 4 + static_cast<int>(i) * 3;
+        const uint32_t color = connected ? kOk : (configured && i == 0U ? kWarn : offColor);
+        m_display.fillRect(x + static_cast<int>(i) * 5, y + 14 - h, 3, h, color);
+    }
 }
 
 void MainUiRenderer::drawProgressBar(int x, int y, int w, int h, uint8_t pct, uint32_t color)

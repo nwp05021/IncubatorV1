@@ -30,6 +30,18 @@ namespace
         if (month < 1U || month > 12U) return 31U;
         return kDays[month - 1U];
     }
+
+    bool dateFromEpoch(uint32_t epoch, uint16_t& year, uint8_t& month, uint8_t& day)
+    {
+        if (epoch == 0U) return false;
+        std::time_t t = static_cast<std::time_t>(epoch);
+        std::tm* tmv = std::localtime(&t);
+        if (!tmv) return false;
+        year = static_cast<uint16_t>(tmv->tm_year + 1900);
+        month = static_cast<uint8_t>(tmv->tm_mon + 1);
+        day = static_cast<uint8_t>(tmv->tm_mday);
+        return year >= 2020U && month >= 1U && month <= 12U && day >= 1U && day <= 31U;
+    }
 }
 
 void UiController::tick(uint32_t nowMs)
@@ -66,11 +78,12 @@ void UiController::syncFromState()
     m_model.lockdownActive = m_state.lockdownActive;
     m_model.turningEnabled = m_state.turningEnabled;
     m_model.nextTurningInMin = m_state.nextTurningInMin;
+    m_model.batchStartEpoch = m_state.batchStartEpoch;
     m_model.safeMode = m_state.safeMode;
     m_model.manualMode = m_state.manualMode;
     m_model.bootCount = m_state.bootCount;
     m_model.uptimeMs = m_state.uptimeMs;
-    m_model.cloudConnected = m_state.cloudConnected;
+    m_model.cloudConnected = m_state.cloudConnected || m_provisioning.isConnected();
     std::memcpy(m_model.ipAddress, m_state.ipAddress, sizeof(m_model.ipAddress));
 
     m_model.wifiConfigured = m_provisioning.isConfigured();
@@ -188,7 +201,7 @@ void UiController::enterMenuItem()
     m_model.actionMessage[0] = '\0';
     switch (m_model.menuCursor) {
         case 0:
-            initDateFromNow();
+            initDateFromSavedOrNow();
             m_model.fieldCursor = 0;
             m_model.editMode = false;
             m_model.screen = UiScreen::StartDate;
@@ -279,8 +292,14 @@ void UiController::startDateClick()
         domain::IncubationBatch batch;
         batch.species = domain::Species::Chicken;
         batch.startEpoch = editDateEpoch();
-        m_ctrl.applyCommand(app::Cmd::StartBatch, &batch, sizeof(batch));
-        std::snprintf(m_model.actionMessage, sizeof(m_model.actionMessage), "시작일 저장");
+        if (m_ctrl.applyCommand(app::Cmd::StartBatch, &batch, sizeof(batch))) {
+            m_model.batchStartEpoch = batch.startEpoch;
+            std::snprintf(m_model.actionMessage, sizeof(m_model.actionMessage), "시작일 저장");
+            goMenu();
+        } else {
+            std::snprintf(m_model.actionMessage, sizeof(m_model.actionMessage), "저장 실패");
+        }
+        return;
     }
     goMenu();
 }
@@ -497,8 +516,12 @@ uint32_t UiController::editDateEpoch() const
     return (t < 0) ? 0U : static_cast<uint32_t>(t);
 }
 
-void UiController::initDateFromNow()
+void UiController::initDateFromSavedOrNow()
 {
+    if (dateFromEpoch(m_model.batchStartEpoch, m_model.editBatchYear, m_model.editBatchMonth, m_model.editBatchDay)) {
+        return;
+    }
+
     std::time_t now = std::time(nullptr);
     std::tm* tmv = std::localtime(&now);
     if (tmv) {

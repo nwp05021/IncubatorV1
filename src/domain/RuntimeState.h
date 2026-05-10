@@ -31,6 +31,7 @@ namespace incubator::domain
         uint32_t uptimeMs            = 0;
         uint32_t bootCount           = 0;
         uint32_t lastTurningMs       = 0;
+        uint32_t batchStartEpoch     = 0;
         char     ipAddress[16]       = {};
 
         static RuntimeState zero()

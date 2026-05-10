@@ -38,6 +38,7 @@ namespace incubator::infra
         bool isFailed() const { return m_state == ProvisioningState::Failed || m_state == ProvisioningState::TimedOut; }
         uint32_t remainingMs(uint32_t nowMs) const;
         ProvisioningState state() const { return m_state; }
+        void handleEvent(int32_t eventId, void* eventInfo);
 
         const char* deviceName() const { return m_deviceName; }
         const char* proofOfPossession() const { return m_pop; }
@@ -48,6 +49,7 @@ namespace incubator::infra
         void stopProvisioning();
         void buildDeviceIdentity();
         void markConnected();
+        void startTimeSync();
 
         domain::AppSettings& m_settings;
         storage::NvsStorage& m_nvs;
@@ -57,6 +59,8 @@ namespace incubator::infra
         uint32_t m_startedAtMs = 0;
         uint32_t m_timeoutMs = 0;
         uint32_t m_lastConnectLogMs = 0;
+        uint32_t m_finishAtMs = 0;
+        bool m_timeSyncStarted = false;
         char m_deviceName[32] = {};
         char m_pop[16] = "incubator";
     };

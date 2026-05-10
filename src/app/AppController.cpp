@@ -97,17 +97,22 @@ bool AppController::cmdStartBatch(const domain::IncubationBatch& b)
     m_batch.active = true;
     if (m_batch.batchId[0] == '\0') generateBatchId(m_batch);
     if (!cmdResetPlan()) return false;
-    m_state.batchActive = true;
-    m_state.currentDay = 1;
-    m_state.totalDays = m_batch.totalDays;
-    m_state.lockdownActive = false;
-    m_state.lockdownStartDay = m_batch.lockdownStartDay;
+    applyBatchToState();
     if (const auto* row = m_plan.getRow(1)) {
         m_state.targetTempC = row->targetTempC;
         m_state.targetHumidityPct = row->targetHumidityPct;
         m_state.turningEnabled = row->turningEnabled;
     }
-    m_nvs.saveBlob(storage::NvsStorage::kKeyBatch, &m_batch, sizeof(m_batch));
+    if (!m_batch.isValid()) {
+        ESP_LOGE("AppCtrl", "Batch invalid after plan generation");
+        m_state.safeMode = true;
+        return false;
+    }
+    if (!m_nvs.saveBlob(storage::NvsStorage::kKeyBatch, &m_batch, sizeof(m_batch))) {
+        ESP_LOGE("AppCtrl", "Batch save failed");
+        m_state.safeMode = true;
+        return false;
+    }
     ESP_LOGI("AppCtrl", "Batch started: %s (%s)", m_batch.batchId,
              domain::speciesName(m_batch.species));
     return true;
@@ -144,8 +149,16 @@ bool AppController::cmdResetPlan()
         m_state.safeMode = true;
         return false;
     }
-    m_planStorage.save(m_plan);
-    m_nvs.saveBlob(storage::NvsStorage::kKeyBatch, &m_batch, sizeof(m_batch));
+    if (!m_planStorage.save(m_plan)) {
+        ESP_LOGE("AppCtrl", "Plan save failed");
+        m_state.safeMode = true;
+        return false;
+    }
+    if (!m_nvs.saveBlob(storage::NvsStorage::kKeyBatch, &m_batch, sizeof(m_batch))) {
+        ESP_LOGE("AppCtrl", "Batch save failed during plan reset");
+        m_state.safeMode = true;
+        return false;
+    }
     return true;
 }
 
@@ -251,6 +264,7 @@ bool AppController::restoreFromStorage()
     domain::IncubationBatch b{};
     if (m_nvs.loadBlob(storage::NvsStorage::kKeyBatch, &b, sizeof(b)) && b.isValid()) {
         m_batch = b;
+        applyBatchToState();
         ESP_LOGI("AppCtrl", "Batch restored: %s", m_batch.batchId);
     }
 
@@ -283,6 +297,16 @@ void AppController::generateBatchId(domain::IncubationBatch& b)
 {
     uint32_t cnt = m_state.bootCount;
     std::snprintf(b.batchId, sizeof(b.batchId), "INC-%03u", static_cast<unsigned>(cnt % 1000));
+}
+
+void AppController::applyBatchToState()
+{
+    m_state.batchActive = m_batch.active;
+    m_state.currentDay = 1;
+    m_state.totalDays = m_batch.totalDays;
+    m_state.lockdownActive = false;
+    m_state.lockdownStartDay = m_batch.lockdownStartDay;
+    m_state.batchStartEpoch = m_batch.startEpoch;
 }
 
 } // namespace incubator::app

@@ -20,6 +20,7 @@ namespace incubator::ui
         ProvisioningRenderer m_provisioningRenderer;
         uint32_t m_lastRenderMs = 0;
         uint32_t m_lastVisibleHash = 0;
+        uint32_t m_renderNowMs = 0;
         bool     m_hasRendered = false;
 
         void renderPage0();
@@ -40,7 +41,7 @@ namespace incubator::ui
         void renderFooter();
         void drawStatusIcons();
         void drawStatusBar();
-        void drawSignalBars(int x, int y, bool connected);
+        void drawSignalBars(int x, int y, bool connected, bool configured);
         void drawProgressBar(int x, int y, int w, int h, uint8_t pct, uint32_t color);
         void drawPill(int x, int y, int w, const char* label, uint32_t color);
         void drawRow(int y, const char* label, const char* value, bool selected = false, uint32_t accent = 0);

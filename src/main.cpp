@@ -148,6 +148,8 @@ void setup()
         delay(800);
     }
 
+    g::provisioning.startBootProvisioning(millis());
+
     ESP_LOGI(TAG, "Setup complete. Boot#%u", g::state.bootCount);
 }
 

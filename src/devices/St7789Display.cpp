@@ -92,12 +92,12 @@ void St7789Display::drawNumberText(int x, int y, const char* text)
     if (!m_initialized) return;
     if (m_canvasReady) {
         m_canvas.setFont(&fonts::Font6);
-        m_canvas.setTextSize(1);
+        m_canvas.setTextSize(m_textSize);
         m_canvas.setCursor(x, y);
         m_canvas.print(text);
     } else {
         m_gfx.setFont(&fonts::Font6);
-        m_gfx.setTextSize(1);
+        m_gfx.setTextSize(m_textSize);
         m_gfx.setCursor(x, y);
         m_gfx.print(text);
     }

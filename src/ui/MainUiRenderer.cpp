@@ -76,6 +76,8 @@ namespace
         hashValue(hash, model.humiAlarm);
         hashValue(hash, model.tempSensorFault);
         hashValue(hash, model.humiSensorFault);
+        hashValue(hash, model.tempSensorWarning);
+        hashValue(hash, model.humiSensorWarning);
         hashValue(hash, model.lockdownActive);
         hashValue(hash, model.safeMode);
 
@@ -109,6 +111,15 @@ namespace
         hashValue(hash, model.editTurning);
         hashValue(hash, model.editIntervalMin);
         hashValue(hash, model.activeEditField);
+        hashValue(hash, model.planListCount);
+        for (uint8_t i = 0; i < model.planListCount; ++i) {
+            hashValue(hash, model.planList[i].day);
+            hashValue(hash, q10(model.planList[i].targetTempC));
+            hashValue(hash, q1(model.planList[i].targetHumidPct));
+            hashValue(hash, model.planList[i].turningEnabled);
+            hashValue(hash, model.planList[i].intervalMin);
+            hashValue(hash, model.planList[i].overridden);
+        }
         hashValue(hash, model.factoryProgressPct);
         hashValue(hash, model.factoryReady);
         hashString(hash, model.actionMessage);
@@ -292,9 +303,10 @@ void MainUiRenderer::drawStatusBar()
 
     if (m_model.screen == UiScreen::Main && m_model.activePage == 0U) {
         drawSignalBars(258, 5, m_model.cloudConnected, m_model.wifiConfigured);
-        const bool alarm = m_model.tempAlarm || m_model.humiAlarm ||
-                           m_model.tempSensorFault || m_model.humiSensorFault;
-        const uint32_t warnColor = alarm ? kDanger : Color::kOffIcon;
+        const bool hardAlarm = m_model.tempAlarm || m_model.humiAlarm ||
+                               m_model.tempSensorFault || m_model.humiSensorFault;
+        const bool sensorWarning = m_model.tempSensorWarning || m_model.humiSensorWarning;
+        const uint32_t warnColor = hardAlarm ? kDanger : (sensorWarning ? kWarn : Color::kOffIcon);
         m_display.drawRect(292, 6, 18, 14, warnColor);
         m_display.setTextSize(1);
         m_display.setTextColor(warnColor, Color::kHeader);
@@ -517,22 +529,22 @@ void MainUiRenderer::renderPlanList()
     m_display.setTextSize(1);
     m_display.setTextColor(Color::kTextDim, Color::kBg);
     m_display.drawText(12, 56, "Day   Temp    Humi    Turn    Int");
-    uint16_t first = (m_model.editDay > 4U) ? static_cast<uint16_t>(m_model.editDay - 3U) : 1U;
-    for (uint8_t i = 0; i < 5; ++i) {
-        uint16_t day = first + i;
-        if (day > m_model.totalDays) break;
+    for (uint8_t i = 0; i < m_model.planListCount; ++i) {
+        const auto& item = m_model.planList[i];
+        uint16_t day = item.day;
         int y = 72 + i * 28;
         bool sel = (day == m_model.editDay);
         uint32_t bg = sel ? Color::kSelected : Color::kBg;
         m_display.fillRect(8, y, 304, 26, bg);
         m_display.drawRect(8, y, 304, 26, sel ? kTeal : kPanelSoft);
         char row[64];
-        std::snprintf(row, sizeof(row), "D%02u %.1fC %.0f%% %s %um",
+        std::snprintf(row, sizeof(row), "D%02u %.1fC %.0f%% %s %um%s",
                       day,
-                      day == m_model.editDay ? m_model.editTempC : m_model.targetTempC,
-                      day == m_model.editDay ? m_model.editHumidPct : m_model.targetHumidPct,
-                      day == m_model.editDay ? (m_model.editTurning ? "ON" : "OFF") : "-",
-                      day == m_model.editDay ? m_model.editIntervalMin : 0U);
+                      item.targetTempC,
+                      item.targetHumidPct,
+                      item.turningEnabled ? "ON" : "OFF",
+                      item.intervalMin,
+                      item.overridden ? "*" : "");
         m_display.setTextSize(2);
         m_display.setTextColor(sel ? Color::kText : Color::kTextDim, bg);
         m_display.drawText(14, y + 6, row);

@@ -25,8 +25,9 @@ namespace incubator::config
         static constexpr int BUZZER         = -1;   // HIGH=ON (Active Buzzer)
 
         // ── PWM 팬 ───────────────────────────────────
-        // Disabled until the actual fan PWM pin is verified on hardware.
-        static constexpr int FAN_PWM        = -1;
+        // FAN PWM: GPIO18 is output-capable and avoids current I2C/SPI/EC11/relay pins,
+        // boot strapping pins, USB pins, flash/PSRAM pins, and default JTAG pins.
+        static constexpr int FAN_PWM        = 18;
         static constexpr int FAN_PWM_CH     = 0;    // LEDC 채널 0
 
         // ── EC11 로터리 엔코더 ────────────────────────

@@ -12,6 +12,8 @@ namespace incubator::domain
         float    targetHumidityPct    = 55.0f;
         bool     tempSensorOk         = false;
         bool     humiSensorOk         = false;
+        bool     tempSensorWarning    = false;
+        bool     humiSensorWarning    = false;
         bool     heaterOn             = false;
         bool     humidifierOn         = false;
         bool     fanOn                = false;

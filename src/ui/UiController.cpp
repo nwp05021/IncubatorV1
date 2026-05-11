@@ -1,6 +1,7 @@
 #include "ui/UiController.h"
 #include "policy/DayResolver.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -71,6 +72,8 @@ void UiController::syncFromState()
     m_model.humiAlarm = m_state.humiAlarmActive;
     m_model.tempSensorFault = !m_state.tempSensorOk;
     m_model.humiSensorFault = !m_state.humiSensorOk;
+    m_model.tempSensorWarning = m_state.tempSensorWarning;
+    m_model.humiSensorWarning = m_state.humiSensorWarning;
     m_model.currentDay = m_state.currentDay;
     m_model.totalDays = m_state.totalDays;
     m_model.progressPct = policy::DayResolver::progressPct(m_state.currentDay, m_state.totalDays);
@@ -96,6 +99,10 @@ void UiController::syncFromState()
     std::strncpy(m_model.provisioningName, m_provisioning.deviceName(), sizeof(m_model.provisioningName) - 1U);
     std::strncpy(m_model.provisioningPop, m_provisioning.proofOfPossession(), sizeof(m_model.provisioningPop) - 1U);
     std::strncpy(m_model.provisioningMessage, m_provisioning.statusText(), sizeof(m_model.provisioningMessage) - 1U);
+
+    if (m_model.screen == UiScreen::PlanList) {
+        refreshPlanList();
+    }
 }
 
 void UiController::handleInput()
@@ -215,6 +222,7 @@ void UiController::enterMenuItem()
             m_model.screen = UiScreen::PlanList;
             if (m_model.editDay == 0) m_model.editDay = 1;
             loadEditRow(m_model.editDay);
+            refreshPlanList();
             break;
         case 3:
             enterManual();
@@ -337,6 +345,7 @@ void UiController::planListDelta(int d)
     int maxDay = (m_plan.rowCount > 0U) ? m_plan.rowCount : m_model.totalDays;
     m_model.editDay = static_cast<uint16_t>(clampInt(day, 1, maxDay));
     loadEditRow(m_model.editDay);
+    refreshPlanList();
 }
 
 void UiController::wifiResetClick()
@@ -446,7 +455,8 @@ void UiController::page3Delta(int d)
     }
 
     if (m_model.fieldCursor == 0U) {
-        m_model.editTempC = static_cast<float>(clampInt(static_cast<int>((m_model.editTempC + d * 0.1f) * 10.0f), 200, 450)) / 10.0f;
+        int tempQ10 = static_cast<int>(std::lroundf(m_model.editTempC * 10.0f)) + d;
+        m_model.editTempC = static_cast<float>(clampInt(tempQ10, 200, 450)) / 10.0f;
     } else if (m_model.fieldCursor == 1U) {
         m_model.editHumidPct = static_cast<float>(clampInt(static_cast<int>(m_model.editHumidPct + d), 30, 95));
     } else if (m_model.fieldCursor == 2U) {
@@ -486,6 +496,8 @@ void UiController::savePlanEdit()
     row.userOverridden = true;
     if (m_ctrl.applyCommand(app::Cmd::PatchPlanRow, &row, sizeof(row))) {
         m_model.activeEditField = EditField::None;
+        loadEditRow(m_model.editDay);
+        refreshPlanList();
         std::snprintf(m_model.actionMessage, sizeof(m_model.actionMessage), "Day %u 저장", m_model.editDay);
     }
 }
@@ -501,6 +513,27 @@ void UiController::loadEditRow(uint16_t day)
     m_model.editTurning = row->turningEnabled;
     m_model.editIntervalMin = row->turningIntervalMin;
     m_model.editOverridden = row->userOverridden;
+}
+
+void UiController::refreshPlanList()
+{
+    m_model.planListCount = 0;
+    if (m_plan.rowCount == 0U) return;
+
+    uint16_t first = (m_model.editDay > 4U) ? static_cast<uint16_t>(m_model.editDay - 3U) : 1U;
+    for (uint8_t i = 0; i < 5; ++i) {
+        uint16_t day = static_cast<uint16_t>(first + i);
+        const auto* row = m_plan.getRow(day);
+        if (!row) break;
+
+        auto& item = m_model.planList[m_model.planListCount++];
+        item.day = row->day;
+        item.targetTempC = row->targetTempC;
+        item.targetHumidPct = row->targetHumidityPct;
+        item.turningEnabled = row->turningEnabled;
+        item.intervalMin = row->turningIntervalMin;
+        item.overridden = row->userOverridden;
+    }
 }
 
 uint32_t UiController::editDateEpoch() const

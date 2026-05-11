@@ -19,6 +19,16 @@ namespace incubator::ui
         System,
     };
 
+    struct PlanListItem
+    {
+        uint16_t day = 0;
+        float    targetTempC = 0.0f;
+        float    targetHumidPct = 0.0f;
+        bool     turningEnabled = false;
+        uint16_t intervalMin = 0;
+        bool     overridden = false;
+    };
+
     struct UiModel
     {
         float    displayTempC      = 0.0f;
@@ -33,6 +43,8 @@ namespace incubator::ui
         bool     humiAlarm         = false;
         bool     tempSensorFault   = false;
         bool     humiSensorFault   = false;
+        bool     tempSensorWarning = false;
+        bool     humiSensorWarning = false;
         uint16_t currentDay        = 0;
         uint16_t totalDays         = 21;
         uint8_t  progressPct       = 0;
@@ -70,6 +82,8 @@ namespace incubator::ui
         bool     presetConfirm     = false;
         bool     editMode          = false;
         uint8_t  fieldCursor       = 0;
+        uint8_t  planListCount     = 0;
+        PlanListItem planList[5]   = {};
         uint16_t editBatchYear     = 2026;
         uint8_t  editBatchMonth    = 1;
         uint8_t  editBatchDay      = 1;

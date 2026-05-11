@@ -50,7 +50,7 @@ namespace incubator::app
                       devices::GpioOutput&          heater,
                       devices::GpioOutput&          humidifier,
                       devices::GpioOutput&          turner,
-                      devices::PwmFan&             fan)
+                      devices::GpioOutput&          fan)
             : m_state(state), m_settings(settings),
               m_batch(batch), m_plan(plan),
               m_nvs(nvs), m_planStorage(planStorage),
@@ -74,14 +74,13 @@ namespace incubator::app
         devices::GpioOutput&         m_heater;
         devices::GpioOutput&         m_humidifier;
         devices::GpioOutput&         m_turner;
-        devices::PwmFan&             m_fan;
+        devices::GpioOutput&         m_fan;
 
         bool cmdStartBatch(const domain::IncubationBatch& b);
         bool cmdStopBatch();
         bool cmdPatchPlanRow(const domain::IncubationPlanRow& row);
         bool cmdResetPlan();
         bool cmdUpdateSettings(const domain::AppSettings& s);
-        bool cmdSetFanDuty(uint8_t duty);
         bool cmdFactoryReset();
         bool cmdClearWifiInfo();
         bool cmdEnterManualMode();

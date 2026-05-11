@@ -20,6 +20,8 @@ size_t TelemetryBuilder::build(const domain::RuntimeState& state,
     sensor["humidityPct"] = state.currentHumidityPct;
     sensor["tempOk"] = state.tempSensorOk;
     sensor["humiOk"] = state.humiSensorOk;
+    sensor["tempWarning"] = state.tempSensorWarning;
+    sensor["humiWarning"] = state.humiSensorWarning;
 
     auto actuator = doc.createNestedObject("actuator");
     actuator["heater"] = state.heaterOn;

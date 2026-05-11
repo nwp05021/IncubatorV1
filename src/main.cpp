@@ -20,7 +20,8 @@ namespace g
     devices::GpioOutput     humidifier{static_cast<gpio_num_t>(Pin::SSR_HUMIDIFIER)};
     devices::GpioOutput     turner{static_cast<gpio_num_t>(Pin::RELAY_TURNER)};
     devices::GpioOutput     buzzer{static_cast<gpio_num_t>(Pin::BUZZER)};
-    devices::PwmFan         fan{Pin::FAN_PWM, static_cast<ledc_channel_t>(Pin::FAN_PWM_CH)};
+    devices::GpioOutput     fan{static_cast<gpio_num_t>(Pin::FAN_PWM)};
+    //devices::PwmFan         fan{Pin::FAN_PWM, static_cast<ledc_channel_t>(Pin::FAN_PWM_CH)};
     devices::St7789Display  display;
     devices::Ec11Encoder    encoder{Pin::ENC_A, Pin::ENC_B, Pin::ENC_BTN};
 
@@ -179,6 +180,12 @@ extern "C" void app_main()
     setup();
     while (true) {
         loop();
+
+        if (g::heater.isOn()) {
+            g::fan.on();
+        } else {
+            g::fan.on();
+        }
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

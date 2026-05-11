@@ -57,6 +57,7 @@ namespace incubator::ui
         void goHome();
         void savePlanEdit();
         void loadEditRow(uint16_t day);
+        void refreshPlanList();
         uint32_t editDateEpoch() const;
         void initDateFromSavedOrNow();
 

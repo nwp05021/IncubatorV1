@@ -1,8 +1,5 @@
 #include "modules/SensorManager.h"
 #include "devices/Aht20Driver.h"
-#include <esp_log.h>
-
-static const char* TAG = "SensorManager";
 
 namespace incubator::modules
 {
@@ -30,6 +27,8 @@ void SensorManager::tick(uint32_t nowMs)
                 m_state.currentHumidityPct = m_driver.getCachedHumi();
                 m_state.tempSensorOk = true;
                 m_state.humiSensorOk = true;
+                m_state.tempSensorWarning = false;
+                m_state.humiSensorWarning = false;
                 m_lastGoodMs = nowMs;
                 m_failCount = 0;
             } else {
@@ -45,10 +44,16 @@ void SensorManager::tick(uint32_t nowMs)
 void SensorManager::markReadFailed(uint32_t nowMs)
 {
     if (m_failCount < 255U) ++m_failCount;
-    bool hasRecentGood = (m_lastGoodMs != 0U) && (nowMs - m_lastGoodMs < 10000U);
-    if (hasRecentGood && m_failCount < 3U) {
+
+    m_state.tempSensorWarning = true;
+    m_state.humiSensorWarning = true;
+
+    // Keep controlling from the last valid sample. A transient AHT20/I2C miss
+    // should notify the user, not latch the incubator into stopped relays.
+    if (m_lastGoodMs != 0U) {
         return;
     }
+
     m_state.tempSensorOk = false;
     m_state.humiSensorOk = false;
 }

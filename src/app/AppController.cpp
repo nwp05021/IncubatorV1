@@ -61,10 +61,6 @@ bool AppController::applyCommand(Cmd cmd, const void* payload, size_t sz)
         if (!payload || sz != sizeof(domain::AppSettings)) return false;
         return cmdUpdateSettings(*static_cast<const domain::AppSettings*>(payload));
 
-    case Cmd::FanSetDuty:
-        if (!payload || sz != sizeof(uint8_t)) return false;
-        return cmdSetFanDuty(*static_cast<const uint8_t*>(payload));
-
     case Cmd::ClearSafeMode:
         return cmdClearSafeMode();
 
@@ -172,15 +168,6 @@ bool AppController::cmdUpdateSettings(const domain::AppSettings& s)
     return m_nvs.saveBlob(storage::NvsStorage::kKeySettings, &m_settings, sizeof(m_settings));
 }
 
-bool AppController::cmdSetFanDuty(uint8_t duty)
-{
-    if (duty > 100U) duty = 100U;
-    m_fan.setDuty(duty);
-    m_state.fanOn = duty > 0U;
-    ESP_LOGI("AppCtrl", "Fan duty %u%%", static_cast<unsigned>(duty));
-    return true;
-}
-
 bool AppController::cmdFactoryReset()
 {
     m_nvs.eraseAll();
@@ -218,7 +205,7 @@ bool AppController::cmdEnterManualMode()
     m_heater.off();
     m_humidifier.off();
     m_turner.off();
-    m_fan.stop();
+    m_fan.off();
     m_state.heaterOn = false;
     m_state.humidifierOn = false;
     m_state.turnerOn = false;
@@ -232,7 +219,7 @@ bool AppController::cmdExitManualMode()
     m_heater.off();
     m_humidifier.off();
     m_turner.off();
-    m_fan.stop();
+    m_fan.off();
     m_state.heaterOn = false;
     m_state.humidifierOn = false;
     m_state.turnerOn = false;

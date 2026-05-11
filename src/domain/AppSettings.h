@@ -5,8 +5,8 @@ namespace incubator::domain
 {
     struct AppSettings
     {
-        float    tempHysteresis           = 0.5f;
-        float    humidityHysteresis       = 3.0f;
+        float    tempHysteresis           = 0.1f;
+        float    humidityHysteresis       = 2.0f;
         float    tempAlarmHighOffsetC     = 2.0f;
         float    tempAlarmLowOffsetC      = 2.0f;
         float    humidAlarmHighOffsetPct  = 10.0f;

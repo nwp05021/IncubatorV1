@@ -2,7 +2,7 @@
 #include <cstdint>
 
 #ifdef INCUBATOR_ENABLE_CLOUD
-#include <WiFi.h>
+#include <esp_event.h>
 #endif
 
 namespace incubator::cloud
@@ -22,5 +22,15 @@ namespace incubator::cloud
         bool     m_connected = false;
         const char* m_ssid = nullptr;
         const char* m_password = nullptr;
+        char m_ipAddress[16] = {};
+
+#ifdef INCUBATOR_ENABLE_CLOUD
+        static WifiManager* s_instance;
+        static void eventHandler(void* arg,
+                                 esp_event_base_t eventBase,
+                                 int32_t eventId,
+                                 void* eventData);
+        void handleEvent(esp_event_base_t eventBase, int32_t eventId, void* eventData);
+#endif
     };
 }

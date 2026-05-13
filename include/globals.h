@@ -26,4 +26,6 @@
 #ifdef INCUBATOR_ENABLE_CLOUD
 #include "cloud/WifiManager.h"
 #include "cloud/AwsIotClient.h"
+#include "cloud/TelemetryBuilder.h"
+#include "cloud/CmdParser.h"
 #endif

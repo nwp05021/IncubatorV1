@@ -10,6 +10,11 @@ namespace incubator::cloud
     public:
         static size_t build(const domain::RuntimeState& state,
                             const domain::IncubationBatch& batch,
+                            const char* deviceId,
                             char* buf, size_t bufSize);
+
+        static size_t buildHealth(const domain::RuntimeState& state,
+                                  const char* deviceId,
+                                  char* buf, size_t bufSize);
     };
 }

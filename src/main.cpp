@@ -1,4 +1,7 @@
 #include "globals.h"
+#ifdef INCUBATOR_ENABLE_CLOUD
+#include "cloud/AwsIotCredentials.h"
+#endif
 #include "config/PinConfig.h"
 #include "config/AppConfig.h"
 #include <nvs_flash.h>
@@ -6,8 +9,17 @@
 #include <esp_sntp.h>
 #include <Arduino.h>
 #include <esp_log.h>
+#include <cstring>
 
 static const char* TAG = "main";
+
+#ifdef INCUBATOR_ENABLE_CLOUD
+namespace
+{
+    uint32_t s_lastTelemetryMs = 0;
+    uint32_t s_lastHealthMs = 0;
+}
+#endif
 
 namespace g
 {
@@ -101,16 +113,12 @@ void setup()
 #ifdef INCUBATOR_ENABLE_CLOUD
     g::wifiMgr.init(WIFI_SSID, WIFI_PASSWORD);
 
-    extern const uint8_t aws_root_ca_pem_start[];
-    extern const uint8_t cert_pem_crt_start[];
-    extern const uint8_t private_pem_key_start[];
-
     g::awsClient.init(
         AWS_IOT_ENDPOINT,
         INCUBATOR_DEVICE_ID,
-        reinterpret_cast<const char*>(aws_root_ca_pem_start),
-        reinterpret_cast<const char*>(cert_pem_crt_start),
-        reinterpret_cast<const char*>(private_pem_key_start)
+        incubator::cloud::kAwsRootCaPem,
+        incubator::cloud::kAwsDeviceCertPem,
+        incubator::cloud::kAwsPrivateKeyPem
     );
 
     g::awsClient.setCmdCallback(
@@ -121,9 +129,16 @@ void setup()
 #endif
 
 #ifdef INCUBATOR_ENABLE_CLOUD
-    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, "pool.ntp.org");
-    esp_sntp_init();
+    // SNTP가 이미 실행 중인지 확인하여 중복 초기화(Assert 에러) 방지
+    if (esp_sntp_enabled() == 0) { 
+        ESP_LOGI("main", "Initializing SNTP manually...");
+        // 정수 0을 esp_sntp_operatingmode_t 타입으로 명시적 형변환
+        esp_sntp_setoperatingmode(static_cast<esp_sntp_operatingmode_t>(SNTP_OPMODE_POLL));
+        esp_sntp_setservername(0, "pool.ntp.org");
+        esp_sntp_init();
+    } else {
+        ESP_LOGI("main", "SNTP already running, skipping manual init.");
+    }
 #endif
 
     esp_err_t wdtErr = esp_task_wdt_init(static_cast<int>(kWatchdogTimeoutMs / 1000U), true);
@@ -169,6 +184,26 @@ void loop()
 #ifdef INCUBATOR_ENABLE_CLOUD
     g::wifiMgr.tick(now);
     g::awsClient.tick(now);
+    g::state.cloudConnected = g::awsClient.isConnected();
+    std::strncpy(g::state.ipAddress, g::wifiMgr.ipAddress(), sizeof(g::state.ipAddress) - 1U);
+
+    if (g::awsClient.isConnected() && now - s_lastTelemetryMs >= kTelemetryMs) {
+        char json[1536];
+        if (incubator::cloud::TelemetryBuilder::build(
+                g::state, g::batch, INCUBATOR_DEVICE_ID, json, sizeof(json)) > 0U) {
+            g::awsClient.publishTelemetry(json);
+        }
+        s_lastTelemetryMs = now;
+    }
+
+    if (g::awsClient.isConnected() && now - s_lastHealthMs >= kHealthMs) {
+        char json[512];
+        if (incubator::cloud::TelemetryBuilder::buildHealth(
+                g::state, INCUBATOR_DEVICE_ID, json, sizeof(json)) > 0U) {
+            g::awsClient.publishHealth(json, true);
+        }
+        s_lastHealthMs = now;
+    }
 #endif
 
     esp_task_wdt_reset();

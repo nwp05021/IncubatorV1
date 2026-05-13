@@ -13,6 +13,7 @@ static constexpr uint32_t kControlTickMs    =  500U;   // 제어 루프 주기
 static constexpr uint32_t kSchedulerTickMs  = 10000U;  // Day 계산 주기
 static constexpr uint32_t kUiTickMs         =  100U;   // UI 갱신 주기
 static constexpr uint32_t kTelemetryMs      = 60000U;  // Cloud 발행 주기 (Phase 2)
+static constexpr uint32_t kHealthMs         = 30000U;  // AWS IoT health heartbeat interval
 
 // ── Phase 조건부 컴파일 ──────────────────────────────────────────
 // platformio.ini build_flags 로 활성화

@@ -33,7 +33,6 @@ bool CmdParser::parse(const char* json,
     if (cmd == app::Cmd::PatchPlanRow) {
         auto payload = doc["payload"];
         if (!payload.is<JsonObject>()) return false;
-        app::AppController::Cmd ignored;
         domain::IncubationPlanRow row;
         row.day = payload["day"] | 0;
         row.targetTempC = payload["targetTempC"] | 0.0f;

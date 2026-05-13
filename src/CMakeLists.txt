@@ -5,5 +5,5 @@ FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(
     SRCS ${app_sources}
-    REQUIRES bt protocomm wifi_provisioning
+    REQUIRES bt protocomm wifi_provisioning mqtt esp_wifi esp_event esp_netif
 )

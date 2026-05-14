@@ -141,7 +141,15 @@ void setup()
     }
 #endif
 
-    esp_err_t wdtErr = esp_task_wdt_init(static_cast<int>(kWatchdogTimeoutMs / 1000U), true);
+    // --- 수정된 코드 (ESP-IDF 5.1 호환) ---
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = kWatchdogTimeoutMs,        // 밀리초 단위 (기존에는 초 단위였으나 5.1은 ms를 지원함)
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // 모든 코어의 Idle 태스크 감시
+        .trigger_panic = true                    // 타임아웃 시 시스템 재부팅(Panic) 여부
+    };
+
+    esp_err_t wdtErr = esp_task_wdt_init(&twdt_config);
+
     if (wdtErr != ESP_OK && wdtErr != ESP_ERR_INVALID_STATE) {
         ESP_LOGW(TAG, "WDT init failed: %s", esp_err_to_name(wdtErr));
     }

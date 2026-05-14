@@ -20,7 +20,9 @@ namespace incubator::domain
             tableVersion = 0;
             lastUpdatedAt = 0;
             rowCount = 0;
-            std::memset(rows, 0, sizeof(rows));
+            for (auto& row : rows) {
+                row = {}; // 또는 row = incubator::domain::IncubationPlanRow();
+            }
         }
 
         const IncubationPlanRow* getRow(uint16_t day) const

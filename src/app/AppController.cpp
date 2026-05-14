@@ -132,7 +132,7 @@ bool AppController::cmdPatchPlanRow(const domain::IncubationPlanRow& row)
     r->userOverridden = true;
     m_plan.tableVersion++;
     bool ok = m_planStorage.save(m_plan);
-    ESP_LOGI("AppCtrl", "PatchPlanRow: day %u saved (v%u)", row.day, m_plan.tableVersion);
+    ESP_LOGI("AppCtrl", "PatchPlanRow: day %u saved (v%u)", (unsigned int)row.day, (unsigned int)m_plan.tableVersion);
     return ok;
 }
 
@@ -246,7 +246,7 @@ bool AppController::restoreFromStorage()
     cnt++;
     m_nvs.saveU32(storage::NvsStorage::kKeyBootCount, cnt);
     m_state.bootCount = cnt;
-    ESP_LOGI("AppCtrl", "Boot count: %u", cnt);
+    ESP_LOGI("AppCtrl", "Boot count: %u", (unsigned int)cnt);
 
     domain::IncubationBatch b{};
     if (m_nvs.loadBlob(storage::NvsStorage::kKeyBatch, &b, sizeof(b)) && b.isValid()) {

@@ -13,6 +13,7 @@
 
 static const char* TAG = "main";
 
+
 #ifdef INCUBATOR_ENABLE_CLOUD
 namespace
 {

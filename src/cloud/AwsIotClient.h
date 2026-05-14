@@ -35,7 +35,8 @@ namespace incubator::cloud
         bool publish(const char* topic, const char* json);
         bool publishTelemetry(const char* json);
         bool publishHealth(const char* json, bool retain = false);
-        bool isConnected() const { return m_connected; }\n        void setCmdCallback(CmdCallback cb) { m_cmdCb = cb; }
+        bool isConnected() const { return m_connected; };
+        void setCmdCallback(CmdCallback cb) { m_cmdCb = cb; }
         const char* telemetryTopic() const { return m_telemetryTopic; }
         const char* healthTopic() const { return m_healthTopic; }
         const char* commandTopic() const { return m_cmdTopic; }

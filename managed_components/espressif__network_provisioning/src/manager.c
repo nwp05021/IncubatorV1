@@ -159,9 +159,6 @@ struct network_prov_mgr_ctx {
     wifi_ap_record_t *ap_list[14];
     wifi_ap_record_t *ap_list_sorted[MAX_SCAN_RESULTS];
     wifi_scan_config_t scan_cfg;
-
-    /* Total number of attempts done for connecting to Wi-Fi */
-    uint32_t connection_attempts_completed;
 #endif // CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
 
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
@@ -190,7 +187,7 @@ static struct network_prov_mgr_ctx *prov_ctx;
 
 /* This executes registered app_event_callback for a particular event
  *
- * NOTE : By the time this function returns, it is possible that
+ * NOTE : By the time this fucntion returns, it is possible that
  * the manager got de-initialized due to a call to network_prov_mgr_deinit()
  * either inside the event callbacks or from another thread. Therefore
  * post execution of execute_event_cb(), the validity of prov_ctx must
@@ -1164,25 +1161,6 @@ esp_err_t network_prov_mgr_get_wifi_state(network_prov_wifi_sta_state_t *state)
     return ESP_OK;
 }
 
-esp_err_t network_prov_mgr_get_wifi_remaining_conn_attempts(uint32_t *attempts_remaining)
-{
-    if (!prov_ctx_lock) {
-        ESP_LOGE(TAG, "Provisioning manager not initialized");
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    ACQUIRE_LOCK(prov_ctx_lock);
-    if (prov_ctx == NULL || attempts_remaining == NULL) {
-        RELEASE_LOCK(prov_ctx_lock);
-        return ESP_FAIL;
-    }
-
-    *attempts_remaining =
-        prov_ctx->mgr_config.network_prov_wifi_conn_cfg.wifi_conn_attempts - prov_ctx->connection_attempts_completed;
-    RELEASE_LOCK(prov_ctx_lock);
-    return ESP_OK;
-}
-
 esp_err_t network_prov_mgr_get_wifi_disconnect_reason(network_prov_wifi_sta_fail_reason_t *reason)
 {
     if (!prov_ctx_lock) {
@@ -1265,9 +1243,6 @@ esp_err_t network_prov_mgr_configure_wifi_sta(wifi_config_t *wifi_cfg)
         RELEASE_LOCK(prov_ctx_lock);
         return ESP_FAIL;
     }
-
-    execute_event_cb(NETWORK_PROV_SET_WIFI_STA_CONFIG, (void *)wifi_cfg, sizeof(wifi_config_t));
-
     if (prov_ctx->prov_state >= NETWORK_PROV_STATE_CRED_RECV) {
         ESP_LOGE(TAG, "Wi-Fi credentials already received by provisioning app");
         RELEASE_LOCK(prov_ctx_lock);
@@ -1311,8 +1286,6 @@ esp_err_t network_prov_mgr_configure_wifi_sta(wifi_config_t *wifi_cfg)
 
     /* Reset Wi-Fi station state for provisioning app */
     prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_CONNECTING;
-    /* Reset connection attempts counter for new credentials */
-    prov_ctx->connection_attempts_completed = 0;
     prov_ctx->prov_state = NETWORK_PROV_STATE_CRED_RECV;
     /* Execute user registered callback handler */
     execute_event_cb(NETWORK_PROV_WIFI_CRED_RECV, (void *)&wifi_cfg->sta, sizeof(wifi_cfg->sta));
@@ -1496,7 +1469,7 @@ esp_err_t network_prov_mgr_thread_scan_start(bool blocking, uint32_t channel_mas
 
     esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *instance = esp_openthread_get_instance();
-    // Make netif enabled before start scanning
+    // Make netif enabled before start scaning
     if (!otIp6IsEnabled(instance)) {
         if (otIp6SetEnabled(instance, true) != OT_ERROR_NONE) {
             ESP_LOGE(TAG, "Failed to enable netif");
@@ -1785,56 +1758,40 @@ static void network_prov_mgr_event_handler_internal(
         /* Execute user registered callback handler */
         execute_event_cb(NETWORK_PROV_WIFI_CRED_SUCCESS, NULL, 0);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (prov_ctx->mgr_config.network_prov_wifi_conn_cfg.wifi_conn_attempts > 0) {
-            prov_ctx->connection_attempts_completed += 1; /* Increasing attempt after every failure */
-            if (prov_ctx->connection_attempts_completed < prov_ctx->mgr_config.network_prov_wifi_conn_cfg.wifi_conn_attempts) {
-                /* Set WiFi state to NETWORK_PROV_WIFI_STA_CONN_ATTEMPT_FAILED only if the user configure wifi_conn_attempts
-                 * and connection_attempts_completed are less than wifi_conn_attempts.
-                 */
-                prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_CONN_ATTEMPT_FAILED;
-                esp_wifi_connect();
-            } else {
-                /* Station couldn't connect to configured host SSID */
-                ESP_LOGE(TAG, "STA Disconnected");
-                prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_DISCONNECTED;
-            }
-        } else {
-            ESP_LOGE(TAG, "STA Disconnected");
-            prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_DISCONNECTED;
+        ESP_LOGE(TAG, "STA Disconnected");
+        /* Station couldn't connect to configured host SSID */
+        prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_DISCONNECTED;
+
+        wifi_event_sta_disconnected_t *disconnected = (wifi_event_sta_disconnected_t *) event_data;
+        ESP_LOGE(TAG, "Disconnect reason : %d", disconnected->reason);
+
+        /* Set code corresponding to the reason for disconnection */
+        switch (disconnected->reason) {
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_MIC_FAILURE:
+            ESP_LOGE(TAG, "STA Auth Error");
+            prov_ctx->wifi_disconnect_reason = NETWORK_PROV_WIFI_STA_AUTH_ERROR;
+            break;
+        case WIFI_REASON_NO_AP_FOUND:
+            ESP_LOGE(TAG, "STA AP Not found");
+            prov_ctx->wifi_disconnect_reason = NETWORK_PROV_WIFI_STA_AP_NOT_FOUND;
+            break;
+        default:
+            /* If none of the expected reasons,
+             * retry connecting to host SSID */
+            prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_CONNECTING;
+            esp_wifi_connect();
         }
 
         /* In case of disconnection, update state of service and
          * run the event handler with disconnection reason as data */
         if (prov_ctx->wifi_state == NETWORK_PROV_WIFI_STA_DISCONNECTED) {
             prov_ctx->prov_state = NETWORK_PROV_STATE_FAIL;
-            wifi_event_sta_disconnected_t *disconnected = (wifi_event_sta_disconnected_t *) event_data;
-            ESP_LOGE(TAG, "Disconnect reason : %d", disconnected->reason);
-
-            /* Set code corresponding to the reason for disconnection */
-            switch (disconnected->reason) {
-            case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-            case WIFI_REASON_AUTH_FAIL:
-            case WIFI_REASON_HANDSHAKE_TIMEOUT:
-            case WIFI_REASON_MIC_FAILURE:
-                ESP_LOGE(TAG, "STA Auth Error");
-                prov_ctx->wifi_disconnect_reason = NETWORK_PROV_WIFI_STA_AUTH_ERROR;
-                break;
-            case WIFI_REASON_NO_AP_FOUND:
-                ESP_LOGE(TAG, "STA AP Not found");
-                prov_ctx->wifi_disconnect_reason = NETWORK_PROV_WIFI_STA_AP_NOT_FOUND;
-                break;
-            default:
-                if (prov_ctx->mgr_config.network_prov_wifi_conn_cfg.wifi_conn_attempts == 0) {
-                    /* If none of the expected reasons, retry connecting to host SSID */
-                    prov_ctx->wifi_state = NETWORK_PROV_WIFI_STA_CONNECTING;
-                    esp_wifi_connect();
-                }
-            }
-            if (prov_ctx->wifi_state == NETWORK_PROV_WIFI_STA_DISCONNECTED) {
-                /* Execute user registered callback handler */
-                network_prov_wifi_sta_fail_reason_t reason = prov_ctx->wifi_disconnect_reason;
-                execute_event_cb(NETWORK_PROV_WIFI_CRED_FAIL, (void *)&reason, sizeof(reason));
-            }
+            network_prov_wifi_sta_fail_reason_t reason = prov_ctx->wifi_disconnect_reason;
+            /* Execute user registered callback handler */
+            execute_event_cb(NETWORK_PROV_WIFI_CRED_FAIL, (void *)&reason, sizeof(reason));
         }
     }
 #endif // CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
@@ -2003,13 +1960,11 @@ void network_prov_mgr_wait(void)
     RELEASE_LOCK(prov_ctx_lock);
 }
 
-esp_err_t network_prov_mgr_deinit(void)
+void network_prov_mgr_deinit(void)
 {
-    esp_err_t ret = ESP_FAIL;
-
     if (!prov_ctx_lock) {
-        ESP_LOGW(TAG, "Provisioning manager not initialized");
-        return ESP_OK;
+        ESP_LOGE(TAG, "Provisioning manager not initialized");
+        return;
     }
 
     ACQUIRE_LOCK(prov_ctx_lock);
@@ -2029,7 +1984,7 @@ esp_err_t network_prov_mgr_deinit(void)
         RELEASE_LOCK(prov_ctx_lock);
         vSemaphoreDelete(prov_ctx_lock);
         prov_ctx_lock = NULL;
-        return ESP_OK;
+        return;
     }
 
     if (prov_ctx->app_info_json) {
@@ -2062,10 +2017,8 @@ esp_err_t network_prov_mgr_deinit(void)
         if (app_cb) {
             app_cb(app_data, NETWORK_PROV_END, NULL);
         }
-        ret = esp_event_post(NETWORK_PROV_EVENT, NETWORK_PROV_END, NULL, 0, portMAX_DELAY);
-        if (ret != ESP_OK) {
+        if (esp_event_post(NETWORK_PROV_EVENT, NETWORK_PROV_END, NULL, 0, portMAX_DELAY) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to post event NETWORK_PROV_END");
-            return ret;
         }
     }
 
@@ -2084,7 +2037,6 @@ esp_err_t network_prov_mgr_deinit(void)
 
     vSemaphoreDelete(prov_ctx_lock);
     prov_ctx_lock = NULL;
-    return ESP_OK;
 }
 
 esp_err_t network_prov_mgr_start_provisioning(network_prov_security_t security, const void *network_prov_sec_params,
@@ -2352,13 +2304,6 @@ esp_err_t network_prov_mgr_reset_wifi_sm_state_on_failure(void)
     ACQUIRE_LOCK(prov_ctx_lock);
 
     esp_err_t err = ESP_OK;
-    /* If already in STARTED state, reset has already been performed (e.g., by firmware).
-     * Return success as the device is effectively already reset and in provisioning mode. */
-    if (prov_ctx->prov_state == NETWORK_PROV_STATE_STARTED) {
-        ESP_LOGD(TAG, "Reset already performed, device already in provisioning mode");
-        goto exit;
-    }
-
     if (prov_ctx->prov_state != NETWORK_PROV_STATE_FAIL) {
         ESP_LOGE(TAG, "Trying reset when not in failure state. Current state: %d", prov_ctx->prov_state);
         err = ESP_ERR_INVALID_STATE;
@@ -2373,8 +2318,6 @@ esp_err_t network_prov_mgr_reset_wifi_sm_state_on_failure(void)
         goto exit;
     }
 
-    /* Reset connection attempts counter to allow full wifi_conn_attempts retries */
-    prov_ctx->connection_attempts_completed = 0;
     prov_ctx->prov_state = NETWORK_PROV_STATE_STARTED;
 
 exit:
@@ -2459,13 +2402,6 @@ esp_err_t network_prov_mgr_reset_thread_sm_state_on_failure(void)
     otInstance *instance = esp_openthread_get_instance();
 
     esp_openthread_lock_acquire(portMAX_DELAY);
-    /* If already in STARTED state, reset has already been performed (e.g., by firmware).
-     * Return success as the device is effectively already reset and in provisioning mode. */
-    if (prov_ctx->prov_state == NETWORK_PROV_STATE_STARTED) {
-        ESP_LOGD(TAG, "Reset already performed, device already in provisioning mode");
-        goto exit;
-    }
-
     if (prov_ctx->prov_state != NETWORK_PROV_STATE_FAIL) {
         ESP_LOGE(TAG, "Trying reset when not in failure state. Current state: %d", prov_ctx->prov_state);
         err = ESP_ERR_INVALID_STATE;

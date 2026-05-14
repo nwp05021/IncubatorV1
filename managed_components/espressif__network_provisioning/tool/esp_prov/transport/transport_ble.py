@@ -5,15 +5,12 @@
 from . import ble_cli
 from .transport import Transport
 
-DEFAULT_BLE_ADAPTER = 'hci0'
-
 
 class Transport_BLE(Transport):
-    def __init__(self, service_uuid, nu_lookup, ble_adapter=DEFAULT_BLE_ADAPTER):
+    def __init__(self, service_uuid, nu_lookup):
         self.nu_lookup = nu_lookup
         self.service_uuid = service_uuid
         self.name_uuid_lookup = None
-        self.ble_adapter = ble_adapter
         # Expect service UUID like '0000ffff-0000-1000-8000-00805f9b34fb'
         for name in nu_lookup.keys():
             # Calculate characteristic UUID for each endpoint
@@ -25,7 +22,7 @@ class Transport_BLE(Transport):
 
     async def connect(self, devname):
         # Use client to connect to BLE device and bind to service
-        if not await self.cli.connect(devname=devname, iface=self.ble_adapter,
+        if not await self.cli.connect(devname=devname, iface='hci0',
                                       chrc_names=self.nu_lookup.keys(),
                                       fallback_srv_uuid=self.service_uuid):
             raise RuntimeError('Failed to initialize transport')
